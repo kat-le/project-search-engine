@@ -31,6 +31,8 @@ public class Driver {
 		ThreadSafeIndex safe;
 		int crawls = 1;
 		
+		System.out.println("hello");
+		
 		if (args.length >= 1) {
 			if (parser.hasFlag("-threads") || parser.hasFlag("-crawl") || parser.hasFlag("-html")) {
 				int threads = parser.getInteger("-threads", 5);
