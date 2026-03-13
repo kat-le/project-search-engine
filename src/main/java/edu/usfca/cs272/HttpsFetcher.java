@@ -8,6 +8,8 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.Socket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
@@ -67,7 +69,13 @@ public class HttpsFetcher {
 	 * @see #fetchUrl(URL)
 	 */
 	public static Map<String, List<String>> fetchUrl(String url) throws MalformedURLException, IOException {
-		return fetchUrl(new URL(url));
+		 try {
+		        URI uri = new URI(url);
+		        URL parsedUrl = uri.toURL();
+		        return fetchUrl(parsedUrl);
+		    } catch (URISyntaxException e) {
+		        throw new IOException("Invalid URL: " + url, e);
+		    }
 	}
 
 	/**

@@ -25,8 +25,8 @@ public class HtmlCleaner {
 	 * @see String#replaceAll(String, String)
 	 */
 	public static String stripTags(String html) {
-		String regex = "<(!?)\\w+\\s*[\\w\\W]*?>|<\\/\\w+\\s*>";
-		return html.replaceAll(regex, "");
+		//String regex = "<(!?)\\w+\\s*[\\w\\W]*?>|<\\/\\w+\\s*>";
+		return html.replaceAll("<[^>]+>", "");
 	}
 
 	/**

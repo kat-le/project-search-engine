@@ -2,14 +2,22 @@ package edu.usfca.cs272;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.Socket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+
+import javax.net.ssl.HttpsURLConnection;
 
 /**
  * A specialized version of {@link HttpsFetcher} that follows redirects and
@@ -99,6 +107,7 @@ public class HtmlFetcher {
 	 * @see #getRedirect(Map)
 	 */
 	public static String fetch(URL url, int redirects) {
+		System.out.println("Fetching: " + url);
 		String html = null;
 
 		try (
@@ -114,18 +123,97 @@ public class HtmlFetcher {
 			int statusCode = getStatusCode(headers);
 
 		   if (redirects > 0 && redirect != null) {
-	            URL newUrl = new URL(redirect);
-	            return fetch(newUrl, redirects - 1);
+			   try {
+				   URI newUri = url.toURI().resolve(redirect);
+		           return fetch(newUri.toURL(), redirects - 1);
+			   } catch (URISyntaxException | MalformedURLException e) {
+				   return null;
+		   }
 	        }
 		    else if (statusCode == 200 && isHtml(headers)) {
 		    	List<String> content = response.lines().toList();
 	        	html = String.join("\n", content);
-	        }
+        }
 		}
 		catch (IOException e) {
 			html = null;
 		}
 		return html;
+	}
+	
+	  public static String fetchRobust(String urlStr) {
+		    try {
+		        URL url = URI.create(urlStr.trim()).toURL();
+		        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+		        con.setRequestMethod("GET");
+		        con.setConnectTimeout(10000); // 10s connect
+		        con.setReadTimeout(15000);    // 15s read
+		        con.setInstanceFollowRedirects(false); // handle manually
+
+		        // Browser-like headers
+		        con.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+		        con.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+		        con.setRequestProperty("Accept-Encoding", "gzip");
+		        con.setRequestProperty("Connection", "close");
+
+		        int status = con.getResponseCode();
+
+		        // Handle redirects manually
+		        if (status >= 300 && status <= 399) {
+		            String redirect = con.getHeaderField("Location");
+		            if (redirect != null) {
+		                URL newUrl = url.toURI().resolve(redirect).toURL();
+		                con.disconnect();
+		                return fetchRobust(newUrl.toString());
+		            }
+		        }
+
+		        if (status != HttpURLConnection.HTTP_OK) {
+		            System.out.println("Status not 200: " + status);
+		            return null;
+		        }
+
+		        InputStream input = con.getInputStream();
+		        String encoding = con.getContentEncoding();
+		        if ("gzip".equalsIgnoreCase(encoding)) {
+		            input = new GZIPInputStream(input);
+		        }
+
+		        try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
+		            return reader.lines().collect(Collectors.joining("\n"));
+		        } finally {
+		            con.disconnect();
+		        }
+
+		    } catch (IOException | URISyntaxException e) {
+		        System.out.println("Exception fetching: " + e.getMessage());
+		        return null;
+		    }
+		}
+	       
+	public static String fetchSimple(String url) {
+	    try {
+	    	URL urlObj = URI.create(url.trim()).toURL();
+	        HttpURLConnection con = (HttpURLConnection) urlObj.openConnection();
+	        con.setRequestProperty("User-Agent", "Mozilla/5.0"); // some servers block default Java UA
+	        con.setInstanceFollowRedirects(true);
+	        int status = con.getResponseCode();
+	        if (status != 200) {
+	            System.out.println("Status not 200: " + status);
+	            return null;
+	        }
+	        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
+	        String line;
+	        StringBuilder sb = new StringBuilder();
+	        while ((line = in.readLine()) != null) {
+	            sb.append(line).append("\n");
+	        }
+	        in.close();
+	        return sb.toString();
+	    } catch (IOException e) {
+	        System.out.println("Exception fetching: " + e.getMessage());
+	        return null;
+	    }
 	}
 
 	/**
@@ -136,12 +224,13 @@ public class HtmlFetcher {
 	 * @param redirects the number of times to follow redirects
 	 * @return the html or {@code null} if unable to fetch the resource or the
 	 *   resource is not html
+	 * @throws IOException 
 	 *
 	 * @see #fetch(URL, int)
 	 */
 	public static String fetch(String url, int redirects) {
 		try {
-			return fetch(new URL(url), redirects);
+			return fetch(URI.create(url).toURL(), redirects);
 		}
 		catch (MalformedURLException e) {
 			return null;
@@ -155,6 +244,8 @@ public class HtmlFetcher {
 	 * @param url the url to fetch
 	 * @return the html or {@code null} if unable to fetch the resource or the
 	 *   resource is not html
+	 * @throws IOException 
+	 *
 	 *
 	 * @see #fetch(URL, int)
 	 */
@@ -168,6 +259,7 @@ public class HtmlFetcher {
 	 * @param url the url to fetch
 	 * @return the html or {@code null} if unable to fetch the resource or the
 	 *   resource is not html
+	 * @throws IOException 
 	 */
 	public static String fetch(URL url) {
 		return fetch(url, 0);

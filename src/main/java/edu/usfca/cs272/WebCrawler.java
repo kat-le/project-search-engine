@@ -1,6 +1,7 @@
 package edu.usfca.cs272;
 
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ public class WebCrawler {
 	 * @throws MalformedURLException if unable to craft new URL
 	 */
 	public void processHTML(ThreadSafeIndex index, String seed) throws MalformedURLException, URISyntaxException {
-		URL url = new URL(seed);
+		URL url = URI.create(seed).toURL();
 		queue.execute(new Task(url, index, fetched));
 		fetched.add(url);
 		queue.finish();
@@ -67,14 +68,21 @@ public class WebCrawler {
 
 		@Override
 		public void run() {
+			System.out.println("Crawling: " + url.toString());
 			InvertedIndex local = new InvertedIndex();
 			SnowballStemmer stemmer = new SnowballStemmer(SnowballStemmer.ALGORITHM.ENGLISH);
 
-			String html = HtmlFetcher.fetch(url, 3);
+			String html = HtmlFetcher.fetchRobust(url.toString());
+
+			
+			if (html == null) {
+				System.out.println("Failed to fetch: " + url);
+				return;
+			}
 
 			if (html != null) {
 				html = HtmlCleaner.stripBlockElements(html);
-				LinkFinder.findUrls(url, html, urls);
+				LinkFinder.findUrlsMainContent(url, html, urls);
 				html = HtmlCleaner.stripTags(html);
 				html = HtmlCleaner.stripEntities(html);
 				ArrayList<String> stems = FileProcessor.listStems(html, stemmer);
@@ -87,6 +95,7 @@ public class WebCrawler {
 							continue;
 						}
 					}
+					//fetched.add(foundURL);
 					queue.execute(new Task(foundURL, index, fetched));
 					synchronized (fetched) {
 						fetched.add(foundURL);

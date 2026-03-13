@@ -9,6 +9,9 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 
 /**
  * Finds HTTP(S) URLs from the anchor tags within HTML code.
@@ -43,7 +46,9 @@ public class LinkFinder {
 
 		while (matcher.find()) {
 			try {
-				URL absolute = new URL(base, matcher.group(2));
+				URI baseUri = URI.create(base.toString());
+				URI resolved = baseUri.resolve(matcher.group(2));
+				URL absolute = resolved.toURL();
 				URI uri = normalize(absolute).toURI();
 
 				if (isHttp(absolute)) {
@@ -54,6 +59,19 @@ public class LinkFinder {
 				System.out.println("URL is not valid: " + base);
 			}
 		}
+	}
+	
+	public static void findUrlsMainContent(URL base, String html, Collection<URL> urls) {
+	    Document doc = Jsoup.parse(html, base.toString());
+
+	    Element main = doc.selectFirst(".col-sm-8.col-md-9, #content, main, #main, .content, .main");
+
+	    if (main != null) {
+	        String mainHtml = main.html();
+	        findUrls(base, mainHtml, urls);
+	    } else {
+	        findUrls(base, html, urls);
+	    }
 	}
 
 	/**

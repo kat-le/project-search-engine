@@ -30,11 +30,10 @@ public class Driver {
 		WorkQueue queue;
 		ThreadSafeIndex safe;
 		int crawls = 1;
-		
-		System.out.println("hello");
-		
+				
 		if (args.length >= 1) {
-			if (parser.hasFlag("-threads") || parser.hasFlag("-crawl") || parser.hasFlag("-html")) {
+			if (parser.hasFlag("-threads") || parser.hasFlag("-crawl") 
+				|| parser.hasFlag("-html") || parser.hasFlag("-server")) {
 				int threads = parser.getInteger("-threads", 5);
 				queue = threads < 1 ? new WorkQueue() : new WorkQueue(threads);
 				safe = new ThreadSafeIndex();
@@ -85,10 +84,23 @@ public class Driver {
 					System.out.println("Unable to traverse from the path: " + queryPath);
 				}
 			}
+			System.out.println("Words indexed: " + data.numWords());
+			
+			if (parser.hasFlag("-server")) {
 
-			if (queue != null) {
-				queue.shutdown();
-			}
+			    int port = parser.getInteger("-server", 8080);
+
+			    try {
+					SearchServer.start(query, port, queue);
+				} catch (Exception e) {
+					System.out.println("Unable to start server on port: " + port);
+
+				} finally {
+					if (queue != null) {
+				    	queue.shutdown();
+				    }
+				}
+			} 
 
 			if (parser.hasFlag("-counts")) {
 				Path countsPath = parser.getPath("-counts", Path.of("counts.json"));
